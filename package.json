@@ -4,6 +4,7 @@
   "description": "A facebook messenger bot",
   "main": "app.js",
   "scripts": {
+    "start": "node app.js",
     "test": "node app.js"
   },
   "repository": {
