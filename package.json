@@ -17,10 +17,14 @@
     "body-parser": "^1.15.0",
     "config": "^1.20.4",
     "express": "^4.13.4",
-    "request": "^2.72.0"
+    "request": "^2.72.0",
+    "mongoose": "^4.5.2"
   },
   "bugs": {
     "url": "https://github.com/ericluii/my-places/issues"
   },
-  "homepage": "https://github.com/ericluii/my-places#readme"
+  "homepage": "https://github.com/ericluii/my-places#readme",
+  "engines": {
+    "node": "5.10.0"
+  }
 }
