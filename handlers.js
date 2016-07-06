@@ -1,39 +1,42 @@
 /********************************************************
  * Handles actual app specific logic
  ********************************************************/
+var cache = require('./cache');
+var mapper = require('./mapper');
+
+// States
+const STATE_NULL = 0,
+      STATE_ENTRY_FOUND = 1;
+
+// Function Dictionary for each state
+var HANDLERS = {};
+
+// Current User States - Use the singleton
+var CURRENT_STATES = cache.states;
 
 module.exports = {
   receivedMessageHandler: function(message, marshal) {
-    if (message.contents.text) {
-      // If we receive a text message, check to see if it matches any special
-      // keywords and send back the corresponding example. Otherwise, just echo
-      // the text we received.
-      switch (message.contents.text) {
-        case 'image':
-          marshal.sendImageMessage(message.senderID);
-          break;
-
-        case 'button':
-          marshal.sendButtonMessage(message.senderID);
-          break;
-
-        case 'generic':
-          marshal.sendGenericMessage(message.senderID);
-          break;
-
-        case 'receipt':
-          marshal.sendReceiptMessage(message.senderID);
-          break;
-
-        default:
-          marshal.sendTextMessage(message.senderID, message.contents.text);
-      }
-    } else if (message.contents.attachments) {
-      marshal.sendTextMessage(message.senderID, "Message with attachment received");
+    if (!(message.senderID in CURRENT_STATES)) {
+      CURRENT_STATES[message.senderID] = STATE_NULL;
     }
+
+    HANDLERS[STATE_NULL](message, marshal);
   },
 
   receivedPostbackHandler: function(message, marshal) {
     marshal.sendTextMessage(message.senderID, "Postback called");
+  }
+}
+
+// Setup State Machine Handlers
+HANDLERS[STATE_NULL] = function(message, marshal) {
+  if (message.contents.text) {
+    marshal.sendTextMessage(message.senderID, message.contents.text);
+  } else if (message.contents.attachments) {
+    if (mapper.isCurrentLocation(message.senderID, message.contents.attachments[0])) {
+      marshal.sendTextMessage(message.senderID, "Received your current location (:");
+    } else {
+      marshal.sendTextMessage(message.senderID, "Thanks for telling me about " + message.contents.attachments[0].title);
+    }
   }
 }
