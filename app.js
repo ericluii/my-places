@@ -179,4 +179,7 @@ app.listen(app.get('port'), function() {
   console.log('Node app is running on port', app.get('port'));
 });
 
+// Inform Eric that the server has restarted
+marshal.sendTextMessage(1164396116967254, 'My Places Server has Rebooted.');
+
 module.exports = app;
