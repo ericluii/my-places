@@ -47,13 +47,36 @@ module.exports = {
   isExistingLocation: function(coordinates, callback) {
     Places.find({
       location: {
-        $near: [coordinates.lat, coordinates.long],
-        $maxDistance: 5 / 6371 // 5 km / 6371 km <- convert to radians
+        $near: [coordinates.long, coordinates.lat],
+        $maxDistance: 1 / 6371 // 5 km / 6371 km <- convert to radians
       }
-    }).limit(10).exec(function(err, places) {
+
+    // Limit of 9 is because Quick Replies is capped at 10
+    // we need 1 for the option of creating a new location
+    }).limit(9).exec(function(err, places) {
       if (err) throw err;
 
       callback(places);
+    });
+  },
+
+  addLocation: function(senderID, location, callback) {
+    var place = new Places({
+      name: location.title,
+      category: -1,
+      url: location.url,
+      location: [location.payload.coordinates.long, location.payload.coordinates.lat],
+      creator: senderID,
+      photos: [],
+      notes: [],
+      is_confirmed: false,
+      is_deleted: false
+    });
+
+    place.save(function (err) {
+      if (err) throw err;
+
+      callback(place);
     });
   }
 };

@@ -2,6 +2,7 @@ var mongoose = require('mongoose');
 
 var placesSchema = mongoose.Schema({
   name: String,
+  category: Number,
   url: String,
   location: {
     type: [Number],  // [<longitude>, <latitude>]
@@ -10,7 +11,7 @@ var placesSchema = mongoose.Schema({
   creator: String,
   photos: [String],
   notes: [String],
-  is_interested: Boolean,
+  is_confirmed: Boolean,
   is_deleted: Boolean
 });
 
