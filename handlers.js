@@ -15,7 +15,8 @@ const STATE_NULL = 0,
       STATE_NEW_PLACE_SET_TITLE = 2,
       STATE_NEW_PLACE_SET_CATEGORY = 3,
       STATE_MULTI_SEARCH_RESPONSE = 4,
-      STATE_PLACE_EDIT = 5;
+      STATE_PLACE_EDIT = 5,
+      STATE_LOCATION_QUERY = 6;
 
 // DO NOT CHANGE VALUES.
 // THIS IS ENCODED IN THE DB.
@@ -23,6 +24,7 @@ const STATE_NULL = 0,
 const CATEGORIES = {
   1: 'Restaurant',
   2: 'Cafe',
+  3: 'Dessert',
   9999: 'Other'
 };
 
@@ -44,7 +46,12 @@ function FOUR_OH_FOUR(senderID, message, marshal) {
 }
 
 function ask_for_category(senderID, marshal) {
-  marshal.sendQuickResponse(senderID, 'What category of place is this location?', category_replies);
+  marshal.sendQuickResponse(
+    senderID,
+    'What category of place is this location?',
+    category_replies
+  );
+
   CURRENT_STATES[senderID] = STATE_NEW_PLACE_SET_CATEGORY;
 }
 
@@ -68,90 +75,109 @@ module.exports = {
 HANDLERS[STATE_NULL] = function(message, marshal) {
   if (message.contents.text) {
     marshal.sendTextMessage(message.senderID, message.contents.text);
-  } else if (message.contents.attachments) {
-    var location = message.contents.attachments[0];
+  }
 
-    // Verify we are working with a location
-    if (location.type != "location") {
-      FOUR_OH_FOUR(message.senderID, "Wait... this isn't a place.", marshal);
-    } else {
-      mapper.isExistingLocation(location.payload.coordinates, function(potential_locations) {
-        CURRENT_LOCATIONS[message.senderID] = location;
+  var location = message.contents.attachments[0];
+  // Verify we are working with a location
+  if (location.type != "location") {
+    FOUR_OH_FOUR(message.senderID, "Wait... this isn't a place.", marshal);
+  }
 
-        if (!potential_locations || !potential_locations.length) {
-          CURRENT_STATES[message.senderID] = STATE_CREATE_CONFIRM;
+  mapper.isExistingLocation(
+    location.payload.coordinates,
+    function(potential_locations) {
+      CURRENT_LOCATIONS[message.senderID] = location;
 
-          // Confirm creation
-          marshal.sendQuickResponse(
-            message.senderID,
-            "Would you like me to remember this location?[" + location.title + "]",
-            [
-              {
-                content_type: "text",
-                title: "Yes Please!",
-                payload: message.senderID
-              },
-              {
-                content_type: "text",
-                title: "No Thank You!",
-                payload: -1
-              }
-            ]
-          );
-        } else {
-          CURRENT_STATES[message.senderID] = STATE_MULTI_SEARCH_RESPONSE;
+      if (!potential_locations || !potential_locations.length) {
+        CURRENT_STATES[message.senderID] = STATE_CREATE_CONFIRM;
 
-          var location_replies = [];
-          // A title can be maximum 20 characters long
-          for(var i = 0; i < potential_locations.length; i++) {
-            location_replies.push(
-              {
-                content_type: "text",
-                title: potential_locations[i].name.substring(0, 20),
-                payload: potential_locations[i]._id.toString()
-              }
-            );
+        // Confirm creation
+        marshal.sendQuickResponse(
+          message.senderID,
+          "Would you like me to remember this location?[" + location.title + "]",
+          [
+            {
+              content_type: "text",
+              title: "Yes Please!",
+              payload: message.senderID
+            },
+            {
+              content_type: "text",
+              title: "No Thank You!",
+              payload: -1
+            }
+          ]
+        );
+      } else {
+        CURRENT_STATES[message.senderID] = STATE_MULTI_SEARCH_RESPONSE;
+        location.cache_nearby = potential_locations;
+
+        // Generate quick responses list - closes 9 + create a new place
+        var location_replies = [];
+        location_replies.push(
+          {
+            content_type: "text",
+            title: "Create Place",
+            payload: message.senderID
           }
-
+        );
+        for(var i = 0; i < potential_locations.length; i++) {
           location_replies.push(
             {
               content_type: "text",
-              title: "Create a New Place!",
-              payload: message.senderID
+              title: potential_locations[i].name,
+              payload: potential_locations[i]._id.toString()
             }
           );
-
-          marshal.sendQuickResponse(
-            message.senderID,
-            "Locations nearby. Which do you want to edit?",
-            location_replies
-          );
         }
-      });
+
+        marshal.sendQuickResponse(
+          message.senderID,
+          "Locations nearby. Which do you want to edit?",
+          location_replies
+        );
+      }
     }
-  }
+  );
 }
 
 HANDLERS[STATE_CREATE_CONFIRM] = function(message, marshal) {
   if (!message.contents.quick_reply) {
-    FOUR_OH_FOUR(message.senderID, "All you had to do was press a button... Aborting.", marshal);
+    FOUR_OH_FOUR(
+      message.senderID,
+      "All you had to do was press a button... Aborting.",
+      marshal
+    );
+
     CURRENT_STATES[message.senderID] = STATE_NULL;
-  } else {
-    if (message.contents.quick_reply.payload != -1) {
-      mapper.addLocation(message.senderID, function(place) {
-        mapper.isCurrentLocation(message.senderID, function(isCurrentLocation) {
-          if (isCurrentLocation) {
-            marshal.sendTextMessage(message.senderID, 'Successfully created location. What would you like to name this place?');
-            CURRENT_STATES[message.senderID] = STATE_NEW_PLACE_SET_TITLE;
-          } else {
-            ask_for_category(message.senderID, marshal);
+  }
+
+  if (message.contents.quick_reply.payload != -1) {
+    mapper.addLocation(
+      message.senderID,
+      function(place) {
+        mapper.isCurrentLocation(
+          message.senderID,
+          function(isCurrentLocation) {
+            if (isCurrentLocation) {
+              marshal.sendTextMessage(
+                message.senderID,
+                'Successfully created location. What would you like to name this place?'
+              );
+
+              CURRENT_STATES[message.senderID] = STATE_NEW_PLACE_SET_TITLE;
+            } else {
+              ask_for_category(message.senderID, marshal);
+            }
           }
-        });
-      });
-    } else {
-      marshal.sendTextMessage(message.senderID, "Okay (: I won't! Have a nice day.");
-      CURRENT_STATES[message.senderID] = STATE_NULL;
-    }
+        );
+      }
+    );
+  } else {
+    marshal.sendTextMessage(
+      message.senderID,
+      'Okay (: I won\'t! Have a nice day.'
+    );
 
     CURRENT_STATES[message.senderID] = STATE_NULL;
   }
@@ -159,26 +185,52 @@ HANDLERS[STATE_CREATE_CONFIRM] = function(message, marshal) {
 
 HANDLERS[STATE_MULTI_SEARCH_RESPONSE] = function(message, marshal) {
   if (!message.contents.quick_reply) {
-    FOUR_OH_FOUR(message.senderID, "All you had to do was press a button... Aborting.", marshal);
-    CURRENT_STATES[message.senderID] = STATE_NULL;
-  } else {
-    if (message.contents.quick_reply.payload != -1) {
-      mapper.addLocation(message.senderID, function(place) {
-        mapper.isCurrentLocation(message.senderID, function(isCurrentLocation) {
-          if (isCurrentLocation) {
-            marshal.sendTextMessage(message.senderID, 'Successfully created location. What would you like to name this place?');
-            CURRENT_STATES[message.senderID] = STATE_NEW_PLACE_SET_TITLE;
-          } else {
-            ask_for_category(message.senderID, marshal);
-          }
-        });
-      });
-    } else {
-      marshal.sendTextMessage(message.senderID, "Okay (: I won't! Have a nice day.");
-      CURRENT_STATES[message.senderID] = STATE_NULL;
-    }
+    FOUR_OH_FOUR(
+      message.senderID,
+      "All you had to do was press a button... Aborting.",
+      marshal
+    );
 
     CURRENT_STATES[message.senderID] = STATE_NULL;
+  }
+
+  if (message.contents.quick_reply.payload == message.senderID) {
+    mapper.addLocation(
+      message.senderID,
+      function(place) {
+        mapper.isCurrentLocation(
+          message.senderID,
+          function(isCurrentLocation) {
+            if (isCurrentLocation) {
+              marshal.sendTextMessage(
+                message.senderID,
+                'Successfully created location. What would you like to name this place?'
+              );
+
+              CURRENT_STATES[message.senderID] = STATE_NEW_PLACE_SET_TITLE;
+            } else {
+              ask_for_category(message.senderID, marshal);
+            }
+          }
+        );
+      }
+    );
+  } else {
+    // Set location
+    var potential_locations = CURRENT_LOCATIONS[message.senderID].cache_nearby;
+    for (var i = 0; i < potential_locations.length; i++) {
+      if (potential_locations[i]._id.toString() ==
+            message.contents.quick_reply.payload) {
+        CURRENT_LOCATIONS[message.senderID] = potential_locations[i];
+        break;
+      }
+    }
+
+    marshal.sendTextMessage(
+      message.senderID,
+      'What would you like to know about \'' + CURRENT_LOCATIONS[message.senderID].name + '\'?'
+    );
+    CURRENT_STATES[message.senderID] = STATE_LOCATION_QUERY;
   }
 }
 
@@ -193,20 +245,31 @@ HANDLERS[STATE_NEW_PLACE_SET_TITLE] = function(message, marshal) {
     CURRENT_LOCATIONS[message.senderID].save(function (err) {
       if (err) throw err;
 
-      marshal.sendTextMessage(message.senderID, 'Saved name as \'' + message.contents.text + '\'.');
+      marshal.sendTextMessage(
+        message.senderID,
+        'Saved name as \'' + message.contents.text + '\'.',
+        function() {
+          ask_for_category(message.senderID, marshal);
+        }
+      );
     });
-
-    ask_for_category(message.senderID, marshal);
   } else {
-    marshal.sendTextMessage(message.senderID, 'Instructions unclear? Too bad. I want a title not a pug gif.');
+    marshal.sendTextMessage(
+      message.senderID,
+      'Instructions unclear? Too bad. I want a title not a pug gif.'
+    );
   }
 }
 
 HANDLERS[STATE_NEW_PLACE_SET_CATEGORY] = function(message, marshal) {
   if (!message.contents.quick_reply) {
-    marshal.sendTextMessage(message.senderID, "All you had to do was press a button...Let's try this again.", function() {
-      ask_for_category(message.senderID, marshal);
-    });
+    marshal.sendTextMessage(
+      message.senderID,
+      "All you had to do was press a button...Let's try this again.",
+      function() {
+        ask_for_category(message.senderID, marshal);
+      }
+    );
   } else {
     CURRENT_LOCATIONS[message.senderID].category = message.contents.quick_reply.payload;
     CURRENT_LOCATIONS[message.senderID].save(function (err) {
@@ -217,9 +280,15 @@ HANDLERS[STATE_NEW_PLACE_SET_CATEGORY] = function(message, marshal) {
         'Saved category as \'' + CATEGORIES[message.contents.quick_reply.payload] + '\'.',
         function() {
           marshal.sendTextMessage(message.senderID, 'Thanks for telling me about this place!');
-        });
+        }
+      );
     });
 
     CURRENT_STATES[message.senderID] = STATE_NULL;
   }
+}
+
+HANDLERS[STATE_LOCATION_QUERY] = function(message, marshal) {
+  marshal.sendTextMessage(message.senderID, 'Sorry you cant do anything right now.');
+  CURRENT_STATES[message.senderID] = STATE_NULL;
 }

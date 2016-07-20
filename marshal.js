@@ -69,11 +69,17 @@ var marshal = {
     };
 
     sendMessage(messageData);
-    
+
     typeof callback === 'function' && callback();
   },
 
   sendQuickResponse: function(recipientId, message, responses) {
+    for (var i = 0; i < responses.length; i++) {
+        if (responses[i].title.length > 20) {
+          responses[i].title = responses[i].title.substring(0, 17) + '...';
+        }
+    }
+
     var messageData = {
       recipient: {
         id: recipientId
