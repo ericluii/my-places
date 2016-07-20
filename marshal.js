@@ -22,6 +22,7 @@ function sendMessage (messageData) {
     } else {
       console.error("Unable to send message.");
       console.error(messageData);
+      console.error(response);
       console.error(error);
     }
   });

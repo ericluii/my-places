@@ -13,7 +13,9 @@ var CURRENT_LOCATIONS = cache.locations;
 const STATE_NULL = 0,
       STATE_CREATE_CONFIRM = 1,
       STATE_NEW_PLACE_SET_TITLE = 2,
-      STATE_NEW_PLACE_SET_CATEGORY = 3;
+      STATE_NEW_PLACE_SET_CATEGORY = 3,
+      STATE_MULTI_SEARCH_RESPONSE = 4,
+      STATE_PLACE_EDIT = 5;
 
 // Modulize functions
 function FOUR_OH_FOUR(senderID, message, marshal) {
@@ -50,10 +52,10 @@ HANDLERS[STATE_NULL] = function(message, marshal) {
       FOUR_OH_FOUR(message.senderID, "Wait... this isn't a place.", marshal);
     } else {
       mapper.isExistingLocation(location.payload.coordinates, function(potential_locations) {
+        CURRENT_LOCATIONS[message.senderID] = location;
+
         if (!potential_locations || !potential_locations.length) {
-          // Update state
           CURRENT_STATES[message.senderID] = STATE_CREATE_CONFIRM;
-          CURRENT_LOCATIONS[message.senderID] = location;
 
           // Confirm creation
           marshal.sendQuickResponse(
@@ -72,12 +74,33 @@ HANDLERS[STATE_NULL] = function(message, marshal) {
               }
             ]
           );
-        } else if (potential_locations.length == 1) {
-            marshal.sendTextMessage(message.senderID, "One location nearby");
-            // Is this the location? or create a new one
         } else {
-            marshal.sendTextMessage(message.senderID, "Received your current location (:");
-            // Are any of these the location? or create a new one
+          CURRENT_STATES[message.senderID] = STATE_MULTI_SEARCH_RESPONSE;
+
+          var location_replies = [];
+          for(var i = 0; i < potential_locations.length; i++) {
+            location_replies.push(
+              {
+                content_type: "text",
+                title: potential_locations[i].name,
+                payload: potential_locations[i]._id.toString()
+              }
+            );
+          }
+
+          location_replies.push(
+            {
+              content_type: "text",
+              title: "Create a New Place!",
+              payload: message.senderID
+            }
+          );
+
+          marshal.sendQuickResponse(
+            message.senderID,
+            "Locations nearby. Which do you want to edit?",
+            location_replies
+          );
         }
       });
     }
@@ -117,5 +140,10 @@ HANDLERS[STATE_NEW_PLACE_SET_TITLE] = function(message, marshal) {
 
 HANDLERS[STATE_NEW_PLACE_SET_CATEGORY] = function(message, marshal) {
   marshal.sendTextMessage(message.senderID, 'Category');
+  CURRENT_STATES[message.senderID] = STATE_NULL;
+}
+
+HANDLERS[STATE_MULTI_SEARCH_RESPONSE] = function(message, marshal) {
+  marshal.sendTextMessage(message.senderID, 'Multi Search Response');
   CURRENT_STATES[message.senderID] = STATE_NULL;
 }

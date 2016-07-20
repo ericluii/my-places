@@ -48,7 +48,7 @@ module.exports = {
     Places.find({
       location: {
         $near: [coordinates.long, coordinates.lat],
-        $maxDistance: 1 / 6371 // 5 km / 6371 km <- convert to radians
+        $maxDistance: 5 / 6371 // 5 km / 6371 km <- convert to radians
       }
 
     // Limit of 9 is because Quick Replies is capped at 10
