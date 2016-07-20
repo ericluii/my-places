@@ -11,6 +11,7 @@ var placesSchema = mongoose.Schema({
   creator: String,
   photos: [String],
   notes: [String],
+  memories: [String],
   is_confirmed: Boolean,
   is_deleted: Boolean
 });

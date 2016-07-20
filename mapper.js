@@ -10,10 +10,14 @@ var Places = require('./models/places');
 const PAGE_ACCESS_TOKEN = process.env.MESSENGER_PAGE_ACCESS_TOKEN;
 // Username Info - Use singleton
 var USERS = cache.users;
+var CURRENT_LOCATIONS = cache.locations;
 
 module.exports = {
-  isCurrentLocation: function(senderID, attachment, callback) {
-    if (attachment.title == 'Pinned Location') {
+  isCurrentLocation: function(senderID, callback) {
+    var location = CURRENT_LOCATIONS[senderID];
+
+    // Check if it is a moved pin
+    if (location.name == 'Pinned Location') {
       callback(true);
       return;
     }
@@ -42,10 +46,10 @@ module.exports = {
           USERS[senderID] = users[0];
         }
 
-        callback(attachment.title == USERS[senderID].f_name + '\'s Location');
+        callback(location.name == USERS[senderID].f_name + '\'s Location');
       });
     } else {
-      callback(attachment.title == USERS[senderID].f_name + '\'s Location');
+      callback(location.name == USERS[senderID].f_name + '\'s Location');
     }
   },
 
@@ -53,7 +57,7 @@ module.exports = {
     Places.find({
       location: {
         $near: [coordinates.long, coordinates.lat],
-        $maxDistance: 5 / 6371 // 5 km / 6371 km <- convert to radians
+        $maxDistance: 2 / 111.12 // 111.11999965975954 km / degree  ie. 2 km radius
       }
 
     // Limit of 9 is because Quick Replies is capped at 10
@@ -65,7 +69,9 @@ module.exports = {
     });
   },
 
-  addLocation: function(senderID, location, callback) {
+  addLocation: function(senderID, callback) {
+    var location = CURRENT_LOCATIONS[senderID];
+
     var place = new Places({
       name: location.title,
       category: -1,
@@ -83,5 +89,7 @@ module.exports = {
 
       callback(place);
     });
+
+    CURRENT_LOCATIONS[senderID] = place;
   }
 };

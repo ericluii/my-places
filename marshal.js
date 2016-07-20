@@ -58,7 +58,7 @@ var marshal = {
     handlers.receivedPostbackHandler(message, marshal);
   },
 
-  sendTextMessage: function(recipientId, messageText) {
+  sendTextMessage: function(recipientId, messageText, callback) {
     var messageData = {
       recipient: {
         id: recipientId
@@ -69,6 +69,8 @@ var marshal = {
     };
 
     sendMessage(messageData);
+    
+    typeof callback === 'function' && callback();
   },
 
   sendQuickResponse: function(recipientId, message, responses) {
