@@ -13,6 +13,11 @@ var USERS = cache.users;
 
 module.exports = {
   isCurrentLocation: function(senderID, attachment, callback) {
+    if (attachment.title == 'Pinned Location') {
+      callback(true);
+      return;
+    }
+
     if (!(senderID in USERS)) {
       Users.find(
         { id: senderID }
